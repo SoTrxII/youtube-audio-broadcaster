@@ -23,7 +23,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/stream/:id', function (request, response) {
     console.log('https://www.youtube.com/watch?v=' + request.params.id);
-    const stream = ytdl('https://www.youtube.com/watch?v=' + request.params.id, { filter: 'audioonly', highWaterMark : 50 * 100 * 100 });
+    const stream = ytdl('https://www.youtube.com/watch?v=' + request.params.id, { filter: 'audioonly' });
     stream.on("info", (_, format) => {
         response.sendSeekable(stream, {
             length: format.contentLength
