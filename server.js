@@ -25,8 +25,9 @@ app.get('/stream/:id', function (request, response) {
     console.log('https://www.youtube.com/watch?v=' + request.params.id);
     const stream = ytdl('https://www.youtube.com/watch?v=' + request.params.id, { filter: 'audioonly' });
     stream.on("info", (_, format) => {
+        console.log(format.contentLength);
         response.sendSeekable(stream, {
-            length: format.contentLength
+            length: format.contentLength || 5000000
         });
     });
     
