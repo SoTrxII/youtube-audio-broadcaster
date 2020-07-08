@@ -3,10 +3,14 @@ const path = require("path");
 
 const express = require("express");
 const ytdl = require("ytdl-core");
+const {pipeline} = require("stream");
+const sendSeekable = require('send-seekable');
+
 
 // Express settings
 
 const app = express();
+app.use(sendSeekable);
 
 app.set('port', process.env.PORT || 3000);
 app.set('view engine', 'ejs');
@@ -19,7 +23,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/stream/:id', function (request, response) {
     console.log('https://www.youtube.com/watch?v=' + request.params.id);
-    ytdl('https://www.youtube.com/watch?v=' + request.params.id, { filter: 'audioonly' }).pipe(response);
+    const stream = ytdl('https://www.youtube.com/watch?v=' + request.params.id, { filter: 'audioonly' });
+    stream.on("info", (_, format) => {
+        response.sendSeekable(stream, {
+            length: format.contentLength
+        });
+    });
+    
 });
 
 app.listen(app.get('port'), function () {
