@@ -7,6 +7,6 @@
     "express": "^4.17.1",
     "fluent-ffmpeg": "^2.1.2",
     "send-seekable": "^1.0.4",
-    "ytdl-core": "^4.2.1"
+    "ytdl-core": "^4.3.1"
   }
 }
