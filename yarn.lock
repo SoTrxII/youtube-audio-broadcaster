@@ -469,10 +469,10 @@ which@^1.1.1:
   resolved "https://registry.yarnpkg.com/xtend/-/xtend-4.0.2.tgz#bb72779f5fa465186b1f438f674fa347fdb5db54"
   integrity sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==
 
-ytdl-core@^4.3.1:
-  version "4.3.1"
-  resolved "https://registry.yarnpkg.com/ytdl-core/-/ytdl-core-4.3.1.tgz#d5f9bc5e70b901b374f93347797a93d23a6b1c0b"
-  integrity sha512-3OeQbxeHkfeQe7eKH0NcHZdMYz9HE9s2ISWFmomFKlxYJUq9N3M5IdnlD9YNIqhAY11fGYoCMKcjj/CBwg/1Ug==
+ytdl-core@^4.4.1:
+  version "4.4.1"
+  resolved "https://registry.yarnpkg.com/ytdl-core/-/ytdl-core-4.4.1.tgz#7b7cc4ce6efb7ed6a1dfa2df0aab9136ed7b356c"
+  integrity sha512-VRqJ1pPEfIt7Lja2bKaTRqO47GfVbqhFfKqtmxU5Pp2BM0HUb0gVyf3wL9HlA+Vb4OblXs2MzSqWI8Fi1sSk4Q==
   dependencies:
     m3u8stream "^0.8.3"
     miniget "^4.0.0"
