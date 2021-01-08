@@ -4,6 +4,9 @@ const path = require("path");
 const express = require("express");
 const ytdl = require("ytdl-core");
 const ffmpeg = require('fluent-ffmpeg');
+const logger = require('pino')( {level: 'debug'});
+
+const expressLogger = require('pino-http')({logger: logger});
 const sendSeekable = require('send-seekable');
 
 
@@ -11,31 +14,35 @@ const sendSeekable = require('send-seekable');
 
 const app = express();
 app.use(sendSeekable);
+app.use(expressLogger);
 
 app.set('port', process.env.PORT || 3000);
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
 
-// Express routing
-
-app.use(express.static(path.join(__dirname, 'public')));
-
-
-app.get('/stream/:id', function (request, response) {
-    console.log('https://www.youtube.com/watch?v=' + request.params.id);
-    const stream = ytdl('https://www.youtube.com/watch?v=' + request.params.id, { filter: 'audioonly' });
-    stream.on("info", (_, format) => {
-        console.log(format.contentLength);
-        response.sendSeekable(stream, {
-            length: format.contentLength || 5000000
+app.get('/stream/:id', async function (request, response) {
+    const url = 'https://www.youtube.com/watch?v=' + request.params.id;
+    request.log.info(url);
+    try{
+        if(!await ytdl.validateURL(url)){
+            throw new Error(`Invalid youtube url : ${url}`);
+        }
+        const stream =  ytdl(url, { filter: 'audioonly' });
+        stream.on("info", (_, format) => {
+            logger.debug(`"${url}" content length : ${format.contentLength}`);
+            response.sendSeekable(stream, {
+                length: format.contentLength || 5000000
+            });
         });
-    });
+    }catch (e){
+        logger.error(e);
+        response.statusCode = 400;
+        response.end("This isn't a correct Yt video link");
+    }
+
     
 });
 
 app.get('/download/mp3/:id', async function (request, response) {
-    const url = 'https://www.youtube.com/watch?v=' + request.params.id
-    console.log(url);
+    request.log.debug('https://www.youtube.com/watch?v=' + request.params.id);
     try{
         await ytdl.getInfo(url);
         ffmpeg(ytdl(url))
@@ -47,12 +54,12 @@ app.get('/download/mp3/:id', async function (request, response) {
     } catch (e) {
         response.statusCode = 400;
         response.end("This isn't a correct Yt video link");
-        console.error(e);
+        logger.error(e);
     }
 });
 
 app.listen(app.get('port'), function () {
-    console.log('Started web server on port: ' + app.get('port'));
+    logger.info('Started web server on port: ' + app.get('port'));
 });
 
 module.exports = {};
