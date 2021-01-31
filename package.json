@@ -12,9 +12,9 @@
     "pino": "^6.11.0",
     "pino-http": "^5.3.0",
     "send-seekable": "^1.0.4",
-    "ytdl-core": "^4.4.3"
+    "ytdl-core": "^4.4.5"
   },
   "devDependencies": {
-    "pino-pretty": "^4.3.0"
+    "pino-pretty": "^4.4.0"
   }
 }
