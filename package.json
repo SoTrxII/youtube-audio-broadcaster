@@ -9,12 +9,12 @@
   "dependencies": {
     "express": "^4.17.1",
     "fluent-ffmpeg": "^2.1.2",
-    "pino": "^6.11.1",
+    "pino": "^6.11.3",
     "pino-http": "^5.5.0",
     "send-seekable": "^1.0.4",
-    "ytdl-core": "^4.5.0"
+    "ytdl-core": "^4.7.0"
   },
   "devDependencies": {
-    "pino-pretty": "^4.5.0"
+    "pino-pretty": "^4.7.1"
   }
 }

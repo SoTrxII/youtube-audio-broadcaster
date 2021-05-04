@@ -43,6 +43,7 @@ app.get('/stream/:id', async function (request, response) {
 
 app.get('/download/mp3/:id', async function (request, response) {
     request.log.debug('https://www.youtube.com/watch?v=' + request.params.id);
+    const url = 'https://www.youtube.com/watch?v=' + request.params.id;
     try{
         await ytdl.getInfo(url);
         ffmpeg(ytdl(url))
