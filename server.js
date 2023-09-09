@@ -46,7 +46,7 @@ app.get('/download/mp3/:id', async function (request, response) {
     const url = 'https://www.youtube.com/watch?v=' + request.params.id;
     try{
         await ytdl.getInfo(url);
-        ffmpeg(ytdl(url))
+        ffmpeg(ytdl(url, { filter: 'audioonly' }))
             .on("error", console.error)
             .toFormat('mp3')
             .audioBitrate("192k")
