@@ -2,7 +2,7 @@ FROM node:current-alpine
 WORKDIR /app
 COPY package.json /app
 RUN npm install -g pm2 modclean \
-    && apk add --no-cache ffmpeg \
+    && apk add --no-cache ffmpeg git \
     && npm install --only=prod \
     && modclean -r \
     && modclean -r /usr/local/lib/node_modules/pm2 \
