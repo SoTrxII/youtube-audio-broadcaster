@@ -1,5 +1,5 @@
 build:
-  image: docker:19.03.11
+  image: docker:24.0.5
   stage: build
   services:
     - docker:24.0.5-dind
