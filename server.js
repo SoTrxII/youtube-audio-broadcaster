@@ -2,7 +2,7 @@
 const path = require("path");
 
 const express = require("express");
-const ytdl = require("ytdl-core");
+const ytdl = require("@distube/ytdl-core");
 const ffmpeg = require('fluent-ffmpeg');
 const logger = require('pino')( {level: 'debug'});
 
