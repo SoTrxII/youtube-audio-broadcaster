@@ -12,9 +12,13 @@
     "fluent-ffmpeg": "^2.1.2",
     "pino": "^6.13.0",
     "pino-http": "^5.6.0",
+    "redis": "^4.6.13",
     "send-seekable": "^1.0.4"
   },
   "devDependencies": {
+    "eslint": "^7.32.0 || ^8.2.0",
+    "eslint-config-airbnb-base": "latest",
+    "eslint-plugin-import": "^2.25.2",
     "pino-pretty": "^5.1.2"
   }
 }
