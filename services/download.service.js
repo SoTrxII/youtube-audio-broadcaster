@@ -10,10 +10,6 @@ class DownloadService {
     this.#cache = cache;
   }
 
-  isValidId(id) {
-    return ytdl.validateID(id);
-  }
-
   async streamMp3(id, pt, logger) {
     // Check if the video is already being processed
     const isCached = await this.#cache.has(id);
