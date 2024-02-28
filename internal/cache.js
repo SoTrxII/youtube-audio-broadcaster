@@ -10,6 +10,8 @@ class YtAudioCache {
    */
   #client;
 
+  static #emptyChunk = Buffer.from([0x00]);
+
   constructor(client) {
     this.client = client;
   }
@@ -20,7 +22,7 @@ class YtAudioCache {
    * @returns {Promise<boolean>}
    */
   async has(videoId) {
-    const res = await this.client.exists(`audio_stream:${videoId}`);
+    const res = await this.client.exists(YtAudioCache.#streamName(videoId));
     return res === 1;
   }
 
@@ -31,6 +33,7 @@ class YtAudioCache {
    * @param {pino.Logger} logger Logger instance
    */
   async ingest(videoId, logger) {
+    const streamName = YtAudioCache.#streamName(videoId);
     try {
       const cacheStream = new PassThrough();
 
@@ -44,21 +47,22 @@ class YtAudioCache {
 
       cacheStream.on('data', async (chunk) => {
         // Write each chunk to a Redis stream with the video ID as part of the stream name
-        await this.client.xAdd(`audio_stream:${videoId}`, '*', { chunk }).catch(logger.error);
+        await this.client.xAdd(streamName, '*', { chunk }).catch(logger.error);
       });
 
       cacheStream.on('end', async () => {
         logger.info('Processing finished');
         try {
-          await this.client.xAdd(`audio_stream:${videoId}`, '*', { chunk: Buffer.from([0x00]) });
-          await this.client.expire(`audio_stream:${videoId}`, CACHE_EXPIRE);
+          // The empty chunk will signal the end of the stream
+          await this.client.xAdd(streamName, '*', { chunk: YtAudioCache.#emptyChunk });
+          await this.client.expire(streamName, CACHE_EXPIRE);
         } catch (error) {
           logger.error('Error adding end buffer to stream:', error);
         }
       });
     } catch (error) {
       logger.error('Error processing video; Deleting the key', error);
-      await this.client.del(`audio_stream:${videoId}`);
+      await this.client.del(streamName).catch(logger.error);
     }
   }
 
@@ -71,10 +75,10 @@ class YtAudioCache {
    */
 
   async streamAudio(videoId, to, logger) {
+    const streamName = YtAudioCache.#streamName(videoId);
     const MAX_EMPTY_ITERATIONS = 10;
     let currentId = '0-0';
     let continuePolling = true;
-    const emptyChunk = Buffer.from([0x00]);
     let emptyItCount = 0;
 
     while (continuePolling) {
@@ -83,7 +87,7 @@ class YtAudioCache {
         returnBuffers: true,
       }), [
         {
-          key: `audio_stream:${videoId}`,
+          key: streamName,
           id: currentId,
         },
       ], {
@@ -93,9 +97,9 @@ class YtAudioCache {
 
       // Prevent empty iterations from running indefinitely, which could happen if the stream is empty
       if (!res || res.length === 0 || res[0].messages.length === 0) {
-        emptyItCount++;
+        this.number = emptyItCount++;
         if (emptyItCount > MAX_EMPTY_ITERATIONS) {
-          logger.warn(`During polling of stream "audio_stream:${videoId}", max empty iterations reached. Ending polling.`);
+          logger.warn(`During polling of stream "${streamName}", max empty iterations reached. Ending polling.`);
           continuePolling = false;
           to.end();
         }
@@ -105,7 +109,7 @@ class YtAudioCache {
       const lastMessage = res[0].messages[res[0].messages.length - 1];
       // Look for the end buffer, which should be the only single byte null buffer
       // If found, pop it from the stream to prevent audio cracks
-      if (Buffer.compare(lastMessage.message.chunk, emptyChunk) === 0) {
+      if (Buffer.compare(lastMessage.message.chunk, YtAudioCache.#emptyChunk) === 0) {
         continuePolling = false;
         res[0].messages.pop();
       }
@@ -117,6 +121,10 @@ class YtAudioCache {
       currentId = lastMessage.id;
       emptyItCount = 0;
     }
+  }
+
+  static #streamName(videoId) {
+    return `audio_stream:${videoId}`;
   }
 }
 
