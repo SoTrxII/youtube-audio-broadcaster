@@ -1,5 +1,3 @@
-const ytdl = require('@distube/ytdl-core');
-
 class DownloadService {
   /**
    * @param {YtAudioCache} cache Cache instance
