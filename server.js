@@ -1,13 +1,14 @@
 const redis = require('redis');
-const { PassThrough, Readable } = require('stream');
+const { PassThrough } = require('stream');
 const express = require('express');
 const ytdl = require('@distube/ytdl-core');
 const ffmpeg = require('fluent-ffmpeg');
 const logger = require('pino')({ level: 'debug' });
+const { v4: uuidv4 } = require('uuid');
+
 
 const expressLogger = require('pino-http')({ logger });
 const sendSeekable = require('send-seekable');
-const YtMp3Stream = require('./services/decode-youtube');
 
 // Express settings
 
@@ -20,72 +21,127 @@ const client = redis.createClient();
 client.on('connect', () => console.log('Connected to Redis...'));
 client.on('error', (err) => console.error(err));
 client.connect();
+process.on('exit', () => {
+  console.log('Exiting application. Closing Redis client...');
+  client.quit(); // Close the Redis client
+});
 
 const CACHE_EXPIRE = 4 * 3600;
+app.get('/download/mp3/:id', async (request, response) => {
+  const { id } = request.params;
+  const subLogger = logger.child({ requestId: uuidv4(), videoId: id })
 
-async function checkCache(req, res, next) {
-  const { id } = req.params;
   try {
-    const data = await client.get(redis.commandOptions({ returnBuffers: true }), id);
-    if (data !== null) {
-      logger.info(`Id "${id}" found in Redis cache`);
-      res.setHeader('Content-type', 'audio/mpeg');
-      res.setHeader('Content-length', data.length);
-
-      const stream = new Readable();
-      stream.push(data);
-      stream.push(null);
-
-      res.sendSeekable(stream, {
-        length: data.length,
-      });
-    } else {
-      logger.info(`Id "${id}" not found in Redis cache`);
-      // Data not found in Redis cache, proceed to next middleware
-      next();
+    // Check if the video is already being processed
+    const isCached = await client.exists(`audio_stream:${id}`);
+    if (isCached === 0) {
+      subLogger.info(`"Video is not in cache. Starting processing...`);
+      processVideo(id, subLogger).catch(subLogger.error.bind(subLogger));
     }
-  } catch (e) {
-    req.log.error(e);
-    res.statusCode = 500;
-    res.end('Error while trying to access cache');
+
+    response.setHeader('Content-Type', 'audio/mpeg');
+    const pt = new PassThrough();
+    pt.pipe(response);
+    await streamFromCache(id, pt, subLogger)
+    subLogger.info(`Finished streaming audio data`);
+
+  } catch (error) {
+    response.status(500).send('Error streaming audio data');
+    subLogger.error('Error streaming audio data:', error);
+  }
+});
+
+/**
+ * Stream audio data from the Redis cache, continuously polling the stream for new data until the end buffer is found
+ * @param {string} id Video ID to stream from cache
+ * @param {stream.PassThrough} pt PassThrough stream to pipe the audio data to
+ * @param {pino.Logger} logger Logger instance
+ * @returns {Promise<void>}
+ */
+async function streamFromCache(id, pt, logger) {
+  const MAX_EMPTY_ITERATIONS = 10;
+  let currentId = '0-0';
+  let continuePolling = true;
+  const emptyChunk = Buffer.from([0x00]);
+  let emptyItCount = 0;
+
+  while (continuePolling) {
+    const res = await client.xRead(redis.commandOptions({
+      isolated: true,
+      returnBuffers: true,
+    }), [
+      {
+        key: `audio_stream:${id}`,
+        id: currentId,
+      },
+    ], {
+      // block for 0.1 seconds if there are no new messages
+      BLOCK: 100,
+    });
+
+    // Prevent empty iterations from running indefinitely, which could happen if the stream is empty
+    if (!res || res.length === 0 || res[0].messages.length === 0) {
+      emptyItCount++;
+      if(emptyItCount > MAX_EMPTY_ITERATIONS) {
+        logger.warn(`During polling of stream "audio_stream:${id}", max empty iterations reached. Ending polling.`)
+        continuePolling = false;
+        pt.end();
+      }
+      continue;
+    }
+
+    const lastMessage = res[0].messages[res[0].messages.length - 1];
+    // Look for the end buffer, which should be the only single byte null buffer
+    // If found, pop it from the stream to prevent audio cracks
+    if (Buffer.compare(lastMessage.message.chunk, emptyChunk) === 0) {
+      continuePolling = false;
+      res[0].messages.pop();
+    }
+
+    for (const msg of res[0].messages) {
+      pt.write(msg.message.chunk);
+    }
+
+    currentId = lastMessage.id;
+    emptyItCount = 0;
   }
 }
-app.get('/download/mp3/:id', checkCache, async (request, response) => {
-  const { id } = request.params;
-  const url = `https://www.youtube.com/watch?v=${id}`;
+
+/**
+ * Process the video with the given ID, converting it to an MP3 audio stream and storing it in Redis
+ * @param {string} id Video ID to process
+ * @param {pino.Logger} logger Logger instance
+ */
+async function processVideo(id ,logger) {
   try {
-    const infos = await ytdl.getInfo(url);
+    const cacheStream = new PassThrough();
 
-    const skipCache = infos?.videoDetails?.lengthSeconds > 3 * 3600 ?? false;
-    const cacheStream = new PassThrough(); // Stream to cache data
-    if (!skipCache) {
-      cacheStream.on('data', (chunk) => client.append(id, chunk));
-      cacheStream.on('error', async (e) => {
-        request.log.error(new Error('Error with Redis ', { cause: e }));
-        await client.del(id);
-      });
-      request.on('aborted', async () => {
-        logger.info('Request aborted, deleting from cache');
-        await client.del(id);
-      });
-      cacheStream.on('end', async () => {
-        logger.info('End triggered');
-        await client.expire(id, CACHE_EXPIRE);
-      });
-    }
-
-    ffmpeg(ytdl(url, { filter: 'audioonly' }))
+    // Pipe the output of ffmpeg to the cache stream and Redis stream for the specific video
+    ffmpeg(ytdl(`https://www.youtube.com/watch?v=${id}`, { filter: 'audioonly' }))
       .on('error', logger.error.bind(logger))
       .toFormat('mp3')
       .audioBitrate('192k')
       .noVideo()
       .pipe(cacheStream);
-    cacheStream.pipe(response);
-  } catch (e) {
-    response.statusCode = 400;
-    response.end("This isn't a correct Yt video link");
-    logger.error(e);
+
+    cacheStream.on('data', async (chunk) => {
+      // Write each chunk to a Redis stream with the video ID as part of the stream name
+      await client.xAdd(`audio_stream:${id}`, '*', { chunk }).catch(logger.error);
+    });
+
+    cacheStream.on('end', async () => {
+      logger.info(`Processing finished`);
+      try {
+        await client.xAdd(`audio_stream:${id}`, '*', { chunk: Buffer.from([0x00]) });
+        await client.expire(`audio_stream:${id}`, CACHE_EXPIRE);
+      } catch (error) {
+        logger.error('Error adding end buffer to stream:', error);
+      }
+      // Optionally, you can perform cleanup tasks here
+    });
+  } catch (error) {
+    logger.error('Error processing video:', error);
   }
-});
+}
 
 app.listen(app.get('port'), () => logger.info(`Started web server on port: ${app.get('port')}`));
