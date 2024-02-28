@@ -6,7 +6,6 @@ const ffmpeg = require('fluent-ffmpeg');
 const logger = require('pino')({ level: 'debug' });
 const { v4: uuidv4 } = require('uuid');
 
-
 const expressLogger = require('pino-http')({ logger });
 const sendSeekable = require('send-seekable');
 
@@ -29,22 +28,21 @@ process.on('exit', () => {
 const CACHE_EXPIRE = 4 * 3600;
 app.get('/download/mp3/:id', async (request, response) => {
   const { id } = request.params;
-  const subLogger = logger.child({ requestId: uuidv4(), videoId: id })
+  const subLogger = logger.child({ requestId: uuidv4(), videoId: id });
 
   try {
     // Check if the video is already being processed
     const isCached = await client.exists(`audio_stream:${id}`);
     if (isCached === 0) {
-      subLogger.info(`"Video is not in cache. Starting processing...`);
+      subLogger.info('"Video is not in cache. Starting processing...');
       processVideo(id, subLogger).catch(subLogger.error.bind(subLogger));
     }
 
     response.setHeader('Content-Type', 'audio/mpeg');
     const pt = new PassThrough();
     pt.pipe(response);
-    await streamFromCache(id, pt, subLogger)
-    subLogger.info(`Finished streaming audio data`);
-
+    await streamFromCache(id, pt, subLogger);
+    subLogger.info('Finished streaming audio data');
   } catch (error) {
     response.status(500).send('Error streaming audio data');
     subLogger.error('Error streaming audio data:', error);
@@ -82,8 +80,8 @@ async function streamFromCache(id, pt, logger) {
     // Prevent empty iterations from running indefinitely, which could happen if the stream is empty
     if (!res || res.length === 0 || res[0].messages.length === 0) {
       emptyItCount++;
-      if(emptyItCount > MAX_EMPTY_ITERATIONS) {
-        logger.warn(`During polling of stream "audio_stream:${id}", max empty iterations reached. Ending polling.`)
+      if (emptyItCount > MAX_EMPTY_ITERATIONS) {
+        logger.warn(`During polling of stream "audio_stream:${id}", max empty iterations reached. Ending polling.`);
         continuePolling = false;
         pt.end();
       }
@@ -112,7 +110,7 @@ async function streamFromCache(id, pt, logger) {
  * @param {string} id Video ID to process
  * @param {pino.Logger} logger Logger instance
  */
-async function processVideo(id ,logger) {
+async function processVideo(id, logger) {
   try {
     const cacheStream = new PassThrough();
 
@@ -130,7 +128,7 @@ async function processVideo(id ,logger) {
     });
 
     cacheStream.on('end', async () => {
-      logger.info(`Processing finished`);
+      logger.info('Processing finished');
       try {
         await client.xAdd(`audio_stream:${id}`, '*', { chunk: Buffer.from([0x00]) });
         await client.expire(`audio_stream:${id}`, CACHE_EXPIRE);
