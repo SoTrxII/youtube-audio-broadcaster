@@ -4,8 +4,14 @@ class DownloadService {
    */
   #cache;
 
-  constructor(cache) {
+  /**
+   * @param {convertionFn} decode Function to convert the video to audio
+   */
+  #decode;
+
+  constructor(cache, decode) {
     this.#cache = cache;
+    this.#decode = decode;
   }
 
   async streamMp3(id, pt, logger) {
@@ -13,7 +19,7 @@ class DownloadService {
     const isCached = await this.#cache.has(id);
     if (!isCached) {
       logger.info('"Video is not in cache. Starting processing...');
-      this.#cache.ingest(id, logger).catch(logger.error.bind(logger));
+      this.#cache.ingest(id, this.#decode, logger).catch(logger.error.bind(logger));
     }
 
     await this.#cache.streamAudio(id, pt, logger);

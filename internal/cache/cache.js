@@ -2,9 +2,6 @@ const redis = require('redis');
 const { PassThrough } = require('stream');
 const ffmpeg = require('fluent-ffmpeg');
 const ytdl = require('@distube/ytdl-core');
-/**
- * @typedef {import('pino')} pino
- */
 
 class YtAudioCache {
   /**
@@ -13,10 +10,6 @@ class YtAudioCache {
   #client;
 
   static #emptyChunk = Buffer.from([0x00]);
-
-  /**
-   * @typedef {{targetFormat: string, targetBitrate: string, expirySecondes : number}} Options
-   */
 
   /**
    * @param {Options} #defaultOptions
@@ -56,20 +49,16 @@ class YtAudioCache {
    * Process the video with the given ID,
    * converting it to an MP3 audio stream and storing it in Redis
    * @param {string} videoId Video ID to process
+   * @param {convertionFn} decode Function to convert the video to audio
    * @param {pino.Logger} logger Logger instance
    */
-  async ingest(videoId, logger) {
+  async ingest(videoId, decode, logger) {
     const streamName = YtAudioCache.#streamName(videoId);
     try {
       const cacheStream = new PassThrough();
 
-      // Pipe the output of ffmpeg to the cache stream and Redis stream for the specific video
-      ffmpeg(ytdl(`https://www.youtube.com/watch?v=${videoId}`, { filter: 'audioonly' }))
-        .on('error', logger.error.bind(logger))
-        .toFormat(this.#opt.targetFormat)
-        .audioBitrate(this.#opt.targetBitrate)
-        .noVideo()
-        .pipe(cacheStream);
+      // Decode the video and pipe the audio data to the cache stream
+      decode(videoId, cacheStream, logger, this.#opt);
 
       cacheStream.on('data', async (chunk) => {
         // Write each chunk to a Redis stream with the video ID as part of the stream name
