@@ -3,7 +3,6 @@ const { PassThrough } = require('stream');
 const ffmpeg = require('fluent-ffmpeg');
 const ytdl = require('@distube/ytdl-core');
 
-const CACHE_EXPIRE = 4 * 3600;
 class YtAudioCache {
   /**
    * @param {redis.RedisClient} client Redis client instance
@@ -12,8 +11,32 @@ class YtAudioCache {
 
   static #emptyChunk = Buffer.from([0x00]);
 
-  constructor(client) {
-    this.client = client;
+  /**
+   * @typedef {{targetFormat: string, targetBitrate: string, expirySecondes : number}} Options
+   */
+
+  /**
+   * @param {Options} #defaultOptions
+   */
+  static #defaultOptions = {
+    targetFormat: 'mp3',
+    targetBitrate: '192k',
+    expirySeconds: 4 * 3600,
+  };
+
+  /**
+   * @param {Options} opt
+   */
+  #opt;
+
+  /**
+   *
+   * @param {redis.RedisClient} client
+   * @param {Partial<Options>} opt
+   */
+  constructor(client, opt) {
+    this.#client = client;
+    this.#opt = { ...YtAudioCache.#defaultOptions, ...opt };
   }
 
   /**
@@ -22,7 +45,7 @@ class YtAudioCache {
    * @returns {Promise<boolean>}
    */
   async has(videoId) {
-    const res = await this.client.exists(YtAudioCache.#streamName(videoId));
+    const res = await this.#client.exists(YtAudioCache.#streamName(videoId));
     return res === 1;
   }
 
@@ -40,29 +63,29 @@ class YtAudioCache {
       // Pipe the output of ffmpeg to the cache stream and Redis stream for the specific video
       ffmpeg(ytdl(`https://www.youtube.com/watch?v=${videoId}`, { filter: 'audioonly' }))
         .on('error', logger.error.bind(logger))
-        .toFormat('mp3')
-        .audioBitrate('192k')
+        .toFormat(this.#opt.targetFormat)
+        .audioBitrate(this.#opt.targetBitrate)
         .noVideo()
         .pipe(cacheStream);
 
       cacheStream.on('data', async (chunk) => {
         // Write each chunk to a Redis stream with the video ID as part of the stream name
-        await this.client.xAdd(streamName, '*', { chunk }).catch(logger.error);
+        await this.#client.xAdd(streamName, '*', { chunk }).catch(logger.error);
       });
 
       cacheStream.on('end', async () => {
         logger.info('Processing finished');
         try {
           // The empty chunk will signal the end of the stream
-          await this.client.xAdd(streamName, '*', { chunk: YtAudioCache.#emptyChunk });
-          await this.client.expire(streamName, CACHE_EXPIRE);
+          await this.#client.xAdd(streamName, '*', { chunk: YtAudioCache.#emptyChunk });
+          await this.#client.expire(streamName, this.#opt.expirySeconds);
         } catch (error) {
           logger.error('Error adding end buffer to stream:', error);
         }
       });
     } catch (error) {
       logger.error('Error processing video; Deleting the key', error);
-      await this.client.del(streamName).catch(logger.error);
+      await this.#client.del(streamName).catch(logger.error);
     }
   }
 
@@ -82,7 +105,7 @@ class YtAudioCache {
     let emptyItCount = 0;
 
     while (continuePolling) {
-      const res = await this.client.xRead(redis.commandOptions({
+      const res = await this.#client.xRead(redis.commandOptions({
         isolated: true,
         returnBuffers: true,
       }), [
@@ -97,7 +120,7 @@ class YtAudioCache {
 
       // Prevent empty iterations from running indefinitely, which could happen if the stream is empty
       if (!res || res.length === 0 || res[0].messages.length === 0) {
-        this.number = emptyItCount++;
+        emptyItCount++;
         if (emptyItCount > MAX_EMPTY_ITERATIONS) {
           logger.warn(`During polling of stream "${streamName}", max empty iterations reached. Ending polling.`);
           continuePolling = false;
