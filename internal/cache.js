@@ -2,10 +2,13 @@ const redis = require('redis');
 const { PassThrough } = require('stream');
 const ffmpeg = require('fluent-ffmpeg');
 const ytdl = require('@distube/ytdl-core');
+/**
+ * @typedef {import('pino')} pino
+ */
 
 class YtAudioCache {
   /**
-   * @param {redis.RedisClient} client Redis client instance
+   * @param {redis.Client} client Redis client instance
    */
   #client;
 
@@ -31,7 +34,7 @@ class YtAudioCache {
 
   /**
    *
-   * @param {redis.RedisClient} client
+   * @param {redis.Client} client
    * @param {Partial<Options>} opt
    */
   constructor(client, opt) {
@@ -90,7 +93,8 @@ class YtAudioCache {
   }
 
   /**
-   * Stream audio data from the Redis cache, continuously polling the stream for new data until the end buffer is found
+   * Stream audio data from the Redis cache,
+   * continuously polling the stream for new data until the end buffer is found
    * @param {string} videoId Video ID to stream from cache
    * @param {stream.PassThrough} to PassThrough stream to pipe the audio data to
    * @param {pino.Logger} logger Logger instance
@@ -105,6 +109,7 @@ class YtAudioCache {
     let emptyItCount = 0;
 
     while (continuePolling) {
+      // eslint-disable-next-line no-await-in-loop
       const res = await this.#client.xRead(redis.commandOptions({
         isolated: true,
         returnBuffers: true,
@@ -118,14 +123,16 @@ class YtAudioCache {
         BLOCK: 100,
       });
 
-      // Prevent empty iterations from running indefinitely, which could happen if the stream is empty
+      // Prevent empty iterations from running indefinitely,
+      // which could happen if the end buffer is not found
       if (!res || res.length === 0 || res[0].messages.length === 0) {
-        emptyItCount++;
+        emptyItCount += 1;
         if (emptyItCount > MAX_EMPTY_ITERATIONS) {
           logger.warn(`During polling of stream "${streamName}", max empty iterations reached. Ending polling.`);
           continuePolling = false;
           to.end();
         }
+        // eslint-disable-next-line no-continue
         continue;
       }
 

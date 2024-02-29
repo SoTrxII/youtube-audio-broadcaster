@@ -22,5 +22,6 @@ module.exports = {
     sourceType: 'commonjs',
   },
   rules: {
+    'no-plusplus': ['error', { allowForLoopAfterthoughts: true }],
   },
 };
