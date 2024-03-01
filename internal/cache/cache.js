@@ -1,7 +1,5 @@
 const redis = require('redis');
 const { PassThrough } = require('stream');
-const ffmpeg = require('fluent-ffmpeg');
-const ytdl = require('@distube/ytdl-core');
 
 class YtAudioCache {
   /**
@@ -9,7 +7,7 @@ class YtAudioCache {
    */
   #client;
 
-  static #emptyChunk = Buffer.from([0x00]);
+  static emptyChunk = Buffer.from([0x00]);
 
   /**
    * @param {Options} #defaultOptions
@@ -51,6 +49,7 @@ class YtAudioCache {
    * @param {string} videoId Video ID to process
    * @param {convertionFn} decode Function to convert the video to audio
    * @param {pino.Logger} logger Logger instance
+   * @returns {Promise<Error>} Whether the processing was successful
    */
   async ingest(videoId, decode, logger) {
     const streamName = YtAudioCache.#streamName(videoId);
@@ -61,7 +60,6 @@ class YtAudioCache {
       decode(videoId, cacheStream, logger, this.#opt);
 
       cacheStream.on('data', async (chunk) => {
-        // Write each chunk to a Redis stream with the video ID as part of the stream name
         await this.#client.xAdd(streamName, '*', { chunk }).catch(logger.error);
       });
 
@@ -69,7 +67,7 @@ class YtAudioCache {
         logger.info('Processing finished');
         try {
           // The empty chunk will signal the end of the stream
-          await this.#client.xAdd(streamName, '*', { chunk: YtAudioCache.#emptyChunk });
+          await this.#client.xAdd(streamName, '*', { chunk: YtAudioCache.emptyChunk });
           await this.#client.expire(streamName, this.#opt.expirySeconds);
         } catch (error) {
           logger.error('Error adding end buffer to stream:', error);
@@ -77,8 +75,10 @@ class YtAudioCache {
       });
     } catch (error) {
       logger.error('Error processing video; Deleting the key', error);
-      await this.#client.del(streamName).catch(logger.error);
+      await this.#client.del(streamName).catch(logger.error.bind(logger));
+      return error;
     }
+    return null;
   }
 
   /**
@@ -128,7 +128,7 @@ class YtAudioCache {
       const lastMessage = res[0].messages[res[0].messages.length - 1];
       // Look for the end buffer, which should be the only single byte null buffer
       // If found, pop it from the stream to prevent audio cracks
-      if (Buffer.compare(lastMessage.message.chunk, YtAudioCache.#emptyChunk) === 0) {
+      if (Buffer.compare(lastMessage.message.chunk, YtAudioCache.emptyChunk) === 0) {
         continuePolling = false;
         res[0].messages.pop();
       }
