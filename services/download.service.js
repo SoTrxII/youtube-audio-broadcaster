@@ -9,9 +9,15 @@ class DownloadService {
    */
   #decode;
 
-  constructor(cache, decode) {
+  /**
+   * @param {redisLock.Lock} lock Redis lock instance
+   */
+  #lock;
+
+  constructor(cache, decode, lock) {
     this.#cache = cache;
     this.#decode = decode;
+    this.#lock = lock;
   }
 
   /**
@@ -23,15 +29,21 @@ class DownloadService {
    */
   async streamMp3(id, pt, logger) {
     // Check if the video is already being processed
+    // Lock the video ID to prevent concurrent processing
+    const release = await this.#lock(`lock:${id}`);
+    logger.info('Acquired lock for video:', id);
     const isCached = await this.#cache.has(id);
     if (!isCached) {
       logger.info('"Video is not in cache. Starting processing...');
-      this.#cache.ingest(id, this.#decode, logger).then((err) => {
-        if (err) {
-          logger.error('Error processing video:', err);
-        }
-      }).catch(logger.error.bind(logger));
+      try {
+        await this.#cache.ingestAsync(id, this.#decode, logger);
+      } catch (error) {
+        logger.error('Error processing video:', error);
+        throw error;
+      }
     }
+    logger.info('Released lock for video:', id);
+    await release();
 
     await this.#cache.streamAudio(id, pt, logger);
     logger.info('Finished streaming audio data');

@@ -23,6 +23,9 @@ dependencies:
   redis:
     specifier: ^4.6.13
     version: 4.6.13
+  redis-lock:
+    specifier: ^1.0.0
+    version: 1.0.0
   uuid:
     specifier: ^9.0.1
     version: 9.0.1
@@ -1744,6 +1747,11 @@ packages:
   /real-require@0.2.0:
     resolution: {integrity: sha512-57frrGM/OCTLqLOAh0mhVA9VBMHd+9U7Zb2THMGdBUoZVOtGbJzjxsYGDJ3A9AYYCP4hn6y1TVbaOfzWtm5GFg==}
     engines: {node: '>= 12.13.0'}
+    dev: false
+
+  /redis-lock@1.0.0:
+    resolution: {integrity: sha512-zfI+Il36jXwRT/W8SBsG132Bc2yp3tMuf3KTGjSzXimadI17NEGBvb/KrDkCuAC2hzVxW5uR5ns/rxuqiWeV3Q==}
+    engines: {node: '>=12'}
     dev: false
 
   /redis@4.6.13:

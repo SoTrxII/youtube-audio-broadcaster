@@ -17,7 +17,7 @@ describe('YtAudioCache', () => {
       };
       const cache = new YtAudioCache(fakeRedis, {}, logger);
       const decode = mock.fn(() => { throw new Error('Failed to process video'); });
-      const err = await cache.ingest('test', decode, logger);
+      const err = await cache.ingestWorker('test', new PassThrough(), decode, logger);
       assert.notEqual(err, null);
       assert.equal(err.message, 'Failed to process video');
       assert.equal(delMock.mock.calls.length, 1);
@@ -32,7 +32,7 @@ describe('YtAudioCache', () => {
       };
       const cache = new YtAudioCache(fakeRedis, {}, logger);
       const decode = mock.fn(() => { throw new Error('Failed to process video'); });
-      const err = await cache.ingest('test', decode, logger);
+      const err = await cache.ingestWorker('test', new PassThrough(), decode, logger);
       assert.notEqual(err, null);
       assert.equal(err.message, 'Failed to process video');
       assert.equal(delMock.mock.calls.length, 1);

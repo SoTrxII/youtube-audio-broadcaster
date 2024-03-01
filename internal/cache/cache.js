@@ -44,18 +44,36 @@ class YtAudioCache {
   }
 
   /**
-   * Process the video with the given ID,
+   * Starts processing the video with the given ID,
    * converting it to an MP3 audio stream and storing it in Redis
+   * This methods resolves when the first chunk of audio data is received
+   * from the decoder or rejects if an error occurs
    * @param {string} videoId Video ID to process
    * @param {convertionFn} decode Function to convert the video to audio
    * @param {pino.Logger} logger Logger instance
    * @returns {Promise<Error>} Whether the processing was successful
    */
-  async ingest(videoId, decode, logger) {
+  async ingestAsync(videoId, decode, logger) {
+    return new Promise((res, rej) => {
+      const cacheStream = new PassThrough();
+      cacheStream.once('data', res);
+      cacheStream.once('error', rej);
+      this.ingestWorker(videoId, cacheStream, decode, logger).catch(() => rej());
+    });
+  }
+
+  /**
+   * Process the video with the given ID, converting it to an MP3 audio stream
+   * @param videoId
+   * @param cacheStream
+   * @param decode
+   * @param logger
+   * @returns {Promise<*|null>}
+   */
+  async ingestWorker(videoId, cacheStream, decode, logger) {
+    logger.info('Processing video:', videoId);
     const streamName = YtAudioCache.#streamName(videoId);
     try {
-      const cacheStream = new PassThrough();
-
       // Decode the video and pipe the audio data to the cache stream
       decode(videoId, cacheStream, logger, this.#opt);
 
