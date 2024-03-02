@@ -10,6 +10,8 @@ jobs:
     services:
       redis:
         image: redis
+        ports:
+          - 6379:6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -30,5 +32,5 @@ jobs:
       - name: Execute tests
         run: pnpm run test
         env:
-          REDIS_HOST: redis
+          REDIS_HOST: localhost
           REDIS_PORT: 6379
