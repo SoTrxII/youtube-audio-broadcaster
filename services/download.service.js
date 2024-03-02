@@ -32,19 +32,23 @@ class DownloadService {
   async streamMp3(id, pt, logger) {
     // Check if the video is already being processed
     // Lock the video ID to prevent concurrent processing
-    const release = await this.#lock(`lock:${id}`);
-    logger.debug('Acquired lookup lock');
-    const isCached = await this.#cache.has(id);
-    if (!isCached) {
-      logger.info('Video is not in cache. Starting processing...');
-      try {
-        await this.#cache.ingestAsync(id, this.#decode, logger);
-      } catch (error) {
-        throw new VideoError(error);
+    let release;
+    try {
+      release = await this.#lock(`lock:${id}`);
+      logger.debug('Acquired lookup lock');
+      const isCached = await this.#cache.has(id);
+      if (!isCached) {
+        logger.info('Video is not in cache. Starting processing...');
+        try {
+          await this.#cache.ingestAsync(id, this.#decode, logger);
+        } catch (error) {
+          throw new VideoError(error);
+        }
       }
+    } finally {
+      logger.debug('Released lookup lock');
+      await release();
     }
-    logger.debug('Released lookup lock');
-    await release();
 
     await this.#cache.streamAudio(id, pt, logger);
     logger.info('Finished streaming audio data');
