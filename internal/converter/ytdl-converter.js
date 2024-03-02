@@ -1,5 +1,6 @@
 const ffmpeg = require('fluent-ffmpeg');
 const ytdl = require('@distube/ytdl-core');
+const { pipeline } = require('node:stream/promises');
 
 /**
  * Process the video with the given ID,
@@ -8,13 +9,19 @@ const ytdl = require('@distube/ytdl-core');
  * @param {pino.Logger} logger
  * @param {ConvertionOptions} opt
  */
-function convert(videoId, to, logger, opt) {
-  ffmpeg(ytdl(`https://www.youtube.com/watch?v=${videoId}`, { filter: 'audioonly' }))
-    .on('error', logger.error.bind(logger))
+async function convert(videoId, to, logger, opt) {
+  // Ytdl stream cannot be piped directly to ffmpeg
+  // with the pipeline, so errors need to be handled separately
+  const ytStream = ytdl(`https://www.youtube.com/watch?v=${videoId}`, { filter: 'audioonly' });
+  ytStream.once('error', (error) => {
+    to.emit('error', error);
+  });
+  const transcode = ffmpeg(ytStream)
     .toFormat(opt.targetFormat)
     .audioBitrate(opt.targetBitrate)
-    .noVideo()
-    .pipe(to);
+    .noVideo();
+
+  return pipeline(transcode, to);
 }
 
 module.exports = { convert };

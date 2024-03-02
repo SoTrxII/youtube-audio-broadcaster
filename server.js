@@ -3,6 +3,7 @@ const expressLogger = require('pino-http')({ logger });
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { downloadService } = require('./dependency-injection');
+const { VideoError } = require('./internal/errors/video-error');
 
 const app = express();
 app.use(expressLogger);
@@ -16,8 +17,13 @@ app.get('/download/mp3/:id', async (request, response) => {
     response.setHeader('Content-Type', 'audio/mpeg');
     await downloadService.streamMp3(id, response, subLogger);
   } catch (error) {
+    response.setHeader('Content-type', 'application/text');
+    subLogger.error(`Error in request: ${error.message}`, { error });
+    if (error instanceof VideoError) {
+      response.status(404).send('Video not found');
+      return;
+    }
     response.status(500).send('Error streaming audio data');
-    subLogger.error(`Error streaming audio data: ${error.message}`, { error });
   }
 });
 

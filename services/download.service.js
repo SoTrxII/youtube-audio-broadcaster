@@ -1,3 +1,5 @@
+const { VideoError } = require('../internal/errors/video-error');
+
 class DownloadService {
   /**
    * @param {YtAudioCache} cache Cache instance
@@ -31,18 +33,17 @@ class DownloadService {
     // Check if the video is already being processed
     // Lock the video ID to prevent concurrent processing
     const release = await this.#lock(`lock:${id}`);
-    logger.info('Acquired lock for video:', id);
+    logger.debug('Acquired lookup lock');
     const isCached = await this.#cache.has(id);
     if (!isCached) {
-      logger.info('"Video is not in cache. Starting processing...');
+      logger.info('Video is not in cache. Starting processing...');
       try {
         await this.#cache.ingestAsync(id, this.#decode, logger);
       } catch (error) {
-        logger.error('Error processing video:', error);
-        throw error;
+        throw new VideoError(error);
       }
     }
-    logger.info('Released lock for video:', id);
+    logger.debug('Released lookup lock');
     await release();
 
     await this.#cache.streamAudio(id, pt, logger);

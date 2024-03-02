@@ -58,7 +58,7 @@ class YtAudioCache {
       const cacheStream = new PassThrough();
       cacheStream.once('data', res);
       cacheStream.once('error', rej);
-      this.ingestWorker(videoId, cacheStream, decode, logger).catch(() => rej());
+      this.ingestWorker(videoId, cacheStream, decode, logger);
     });
   }
 
@@ -71,30 +71,27 @@ class YtAudioCache {
    * @returns {Promise<*|null>}
    */
   async ingestWorker(videoId, cacheStream, decode, logger) {
-    logger.info('Processing video:', videoId);
     const streamName = YtAudioCache.#streamName(videoId);
+
+    cacheStream.on('data', async (chunk) => {
+      await this.#client.xAdd(streamName, '*', { chunk }).catch(logger.error);
+    });
+
+    cacheStream.on('end', async () => {
+      logger.info('Processing finished');
+      try {
+        // The empty chunk will signal the end of the stream
+        await this.#client.xAdd(streamName, '*', { chunk: YtAudioCache.emptyChunk });
+        await this.#client.expire(streamName, this.#opt.expirySeconds);
+      } catch (error) {
+        logger.error('Error adding end buffer to stream:', error);
+      }
+    });
+    // Decode the video and pipe the audio data to the cache stream
     try {
-      // Decode the video and pipe the audio data to the cache stream
-      decode(videoId, cacheStream, logger, this.#opt);
-
-      cacheStream.on('data', async (chunk) => {
-        await this.#client.xAdd(streamName, '*', { chunk }).catch(logger.error);
-      });
-
-      cacheStream.on('end', async () => {
-        logger.info('Processing finished');
-        try {
-          // The empty chunk will signal the end of the stream
-          await this.#client.xAdd(streamName, '*', { chunk: YtAudioCache.emptyChunk });
-          await this.#client.expire(streamName, this.#opt.expirySeconds);
-        } catch (error) {
-          logger.error('Error adding end buffer to stream:', error);
-        }
-      });
-    } catch (error) {
-      logger.error('Error processing video; Deleting the key', error);
-      await this.#client.del(streamName).catch(logger.error.bind(logger));
-      return error;
+      await decode(videoId, cacheStream, logger, this.#opt);
+    } catch (e) {
+      logger.error(e);
     }
     return null;
   }
