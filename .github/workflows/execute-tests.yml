@@ -23,9 +23,9 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: '20'
-      - run: npm install
+      - run: pnpm install
       - name: Execute tests
-        run: npm run test
+        run: pnpm run test
         env:
           REDIS_HOST: redis
           REDIS_PORT: 6379
