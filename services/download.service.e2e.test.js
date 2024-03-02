@@ -15,7 +15,11 @@ describe('DownloadService :: Integration', () => {
   const logger = console;
 
   before(() => {
-    client = redis.createClient();
+    client = redis.createClient({
+      host: process.env.REDIS_HOST ?? 'localhost',
+      port: process.env.REDIS_PORT ?? 6379,
+      password: process.env.REDIS_PASSWORD ?? undefined,
+    });
     client.on('connect', () => logger.info('Connected to Redis...'));
     client.on('error', (err) => logger.error(err));
     client.connect().catch(logger.error.bind(logger));
