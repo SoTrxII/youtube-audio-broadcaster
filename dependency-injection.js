@@ -11,11 +11,8 @@ const { convert } = require('./internal/converter/ytdl-converter');
  * @typedef {ConvertionOptions & {expirySecondes : number}} Options
  * @typedef {(videoId: string, to: stream.PassThrough, logger: Logger, opt: ConvertionOptions ) => void} convertionFn
  */
-
 const client = redis.createClient({
-  host: process.env.REDIS_HOST ?? 'localhost',
-  port: process.env.REDIS_PORT ?? 6379,
-  password: process.env.REDIS_PASSWORD ?? undefined,
+  url: process.env.REDIS_CONNECTION_STRING ?? 'redis://localhost:6379',
 });
 const cacheOptions = {
   targetFormat: process.env.AUDIO_FORMAT ?? 'mp3',

@@ -21,15 +21,13 @@ even if the transcoding is not yet finished.
 The configuration is done using environment variables.
 
 
-| Variable         | Description                             | Default     |
-|------------------|-----------------------------------------|-------------|
-| `APP_PORT`       | The port the server listens on          | `3000`      |
-| `REDIS_HOST`     | The host of the Redis server            | `localhost` |
-| `REDIS_PORT`     | The port of the Redis server            | `6379`      |
-| `REDIS_PASSWORD` | The password of the Redis server        |             |
-| `AUDIO_FORMAT`   | The audio format to transcode to        | `mp3`       |
-| `AUDIO_BITRATE`  | The audio bitrate to transcode to       | `128k`      |
-| `AUDIO_EXPIRE`   | The time in seconds the audio is cached | `4 * 3600`  |
+| Variable                  | Description                               | Default                    |
+|---------------------------|-------------------------------------------|----------------------------|
+| `APP_PORT`                | The port the server listens on            | `3000`                     |
+| `REDIS_CONNECTION_STRING` | The Connection string of the Redis server | `'redis://localhost:6379'` |
+| `AUDIO_FORMAT`            | The audio format to transcode to          | `mp3`                      |
+| `AUDIO_BITRATE`           | The audio bitrate to transcode to         | `128k`                     |
+| `AUDIO_EXPIRE`            | The time in seconds the audio is cached   | `4 * 3600`                 |
 
 ## Usage
 
