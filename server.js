@@ -4,10 +4,11 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { downloadService } = require('./dependency-injection');
 const { VideoError } = require('./internal/errors/video-error');
+require('dotenv').config();
 
 const app = express();
 app.use(expressLogger);
-app.set('port', process.env.PORT || 3000);
+app.set('port', process.env.APP_PORT || 3000);
 
 app.get('/download/mp3/:id', async (request, response) => {
   const { id } = request.params;
