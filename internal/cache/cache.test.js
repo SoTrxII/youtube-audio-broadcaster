@@ -7,7 +7,7 @@ const { YtAudioCache } = require('./cache');
 describe('YtAudioCache', () => {
   const logger = console;
 
-  describe('ingest', () => {
+  describe('ingest', (t) => {
     test('Decode error', async () => {
       const delMock = mock.fn(async () => { });
       const fakeRedis = {
@@ -17,13 +17,17 @@ describe('YtAudioCache', () => {
       };
       const cache = new YtAudioCache(fakeRedis, {}, logger);
       const decode = mock.fn(() => { throw new Error('Failed to process video'); });
-      const err = await cache.ingestWorker('test', new PassThrough(), decode, logger);
-      assert.notEqual(err, null);
-      assert.equal(err.message, 'Failed to process video');
-      assert.equal(delMock.mock.calls.length, 1);
+      try {
+        await cache.ingestWorker('test', new PassThrough(), decode, logger);
+        t.fail();
+      } catch (err) {
+        assert.equal(err.message, 'Decoding failed for video test');
+        assert.equal(delMock.mock.calls.length, 1);
+        assert.equal(delMock.mock.calls.length, 1);
+      }
     });
 
-    test('returns error when processing fails', async () => {
+    test('returns error when processing fails', async (t) => {
       const delMock = mock.fn(async () => { });
       const fakeRedis = {
         xAdd: mock.fn(() => { throw new Error('Failed to process video'); }),
@@ -32,10 +36,14 @@ describe('YtAudioCache', () => {
       };
       const cache = new YtAudioCache(fakeRedis, {}, logger);
       const decode = mock.fn(() => { throw new Error('Failed to process video'); });
-      const err = await cache.ingestWorker('test', new PassThrough(), decode, logger);
-      assert.notEqual(err, null);
-      assert.equal(err.message, 'Failed to process video');
-      assert.equal(delMock.mock.calls.length, 1);
+      try {
+        await cache.ingestWorker('test', new PassThrough(), decode, logger);
+        t.fail();
+      } catch (err) {
+        assert.equal(err.message, 'Decoding failed for video test');
+        assert.equal(delMock.mock.calls.length, 1);
+        assert.equal(delMock.mock.calls.length, 1);
+      }
     });
   });
   describe('streamAudio', () => {

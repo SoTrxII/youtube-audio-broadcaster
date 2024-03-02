@@ -51,14 +51,12 @@ class YtAudioCache {
    * @param {string} videoId Video ID to process
    * @param {convertionFn} decode Function to convert the video to audio
    * @param {pino.Logger} logger Logger instance
-   * @returns {Promise<Error>} Whether the processing was successful
    */
   async ingestAsync(videoId, decode, logger) {
     return new Promise((res, rej) => {
       const cacheStream = new PassThrough();
       cacheStream.once('data', res);
-      cacheStream.once('error', rej);
-      this.ingestWorker(videoId, cacheStream, decode, logger);
+      this.ingestWorker(videoId, cacheStream, decode, logger).catch(rej);
     });
   }
 
@@ -68,7 +66,6 @@ class YtAudioCache {
    * @param cacheStream
    * @param decode
    * @param logger
-   * @returns {Promise<*|null>}
    */
   async ingestWorker(videoId, cacheStream, decode, logger) {
     const streamName = YtAudioCache.#streamName(videoId);
@@ -87,13 +84,14 @@ class YtAudioCache {
         logger.error('Error adding end buffer to stream:', error);
       }
     });
+
     // Decode the video and pipe the audio data to the cache stream
     try {
       await decode(videoId, cacheStream, logger, this.#opt);
     } catch (e) {
-      logger.error(e);
+      await this.#client.del(streamName);
+      throw new Error(`Decoding failed for video ${videoId}`, { cause: e });
     }
-    return null;
   }
 
   /**
