@@ -34,7 +34,8 @@ The configuration is done using environment variables.
 
 To start the server, simply run `npm start`.
 
-To start streaming the youtube video audio, make a `GET` request to `/download/mp3/:id` with the `id` query parameter set to the Youtube video ID.
+To start streaming the Youtube video audio, make a `GET` request to either `/download/mp3/:id` or `/stream/:id`
+(both works for backward compatibility reasons) with the `id` query parameter set to the Youtube video ID.
 
 ```bash
 curl http://localhost:3000/download/mp3/VIDEO_ID
