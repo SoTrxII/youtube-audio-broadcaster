@@ -10,7 +10,10 @@ const app = express();
 app.use(expressLogger);
 app.set('port', process.env.APP_PORT || 3000);
 
-app.get('/download/mp3/:id', async (request, response) => {
+app.get('/download/mp3/:id', handleSong);
+app.get('/stream/:id', handleSong);
+
+async function handleSong(request, response) {
   const { id } = request.params;
   const subLogger = logger.child({ requestId: uuidv4(), videoId: id });
 
@@ -26,6 +29,6 @@ app.get('/download/mp3/:id', async (request, response) => {
     }
     response.status(500).send('Error streaming audio data');
   }
-});
+}
 
 app.listen(app.get('port'), () => logger.info(`Started web server on port: ${app.get('port')}`));
