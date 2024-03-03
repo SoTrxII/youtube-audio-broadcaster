@@ -15,6 +15,7 @@ As multiple requests for the same audio data can be made at nearly the same time
 the audio is transcoded and cached asynchronously. As a result, the audio can be played back
 even if the transcoding is not yet finished.
 
+![sequence](./resources/youtube-audio-broadcaster-sequence.png)
 
 ## Configuration
 
