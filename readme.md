@@ -44,3 +44,18 @@ curl http://localhost:3000/download/mp3/VIDEO_ID
 The first call will trigger the download and transcoding of the audio. 
 The other calls will return the cached audio as its being processed.
 
+### Range Requests
+
+This server supports HTTP/1.1 range requests. 
+This is beneficial for serving large files such as audio or video. 
+When a range request is received, the server responds with a portion of the file specified by the range header. 
+This allows the client to request specific parts of the file instead of the entire file, 
+which can improve performance and reduce bandwidth usage.
+
+For example, to request the first 500 bytes of an audio file, 
+the client would send a request with a `Range` header like this:
+
+```bash
+GET /download/mp3/VIDEO_ID HTTP/1.1
+Range: bytes=0-499
+```
