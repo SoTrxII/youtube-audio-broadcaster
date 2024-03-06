@@ -26,10 +26,6 @@ const lock = redisLock(client);
 
 const cache = new YtAudioCache(client, cacheOptions);
 const downloadService = new DownloadService(cache, convert, lock);
-process.on('SIGINT', () => {
-  logger.info('Exiting application. Closing Redis client...');
-  client.quit().catch(logger.error.bind(logger)); // Close the Redis client
-  process.exit(-1);
-});
 
-module.exports = { downloadService };
+
+module.exports = { downloadService, redis: client };

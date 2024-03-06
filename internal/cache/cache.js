@@ -70,18 +70,20 @@ class YtAudioCache {
   async ingestWorker(videoId, cacheStream, decode, logger) {
     const streamName = YtAudioCache.#streamName(videoId);
 
+    let totalBytes = 0;
     cacheStream.on('data', async (chunk) => {
       await this.#client.xAdd(streamName, '*', { chunk }).catch(logger.error);
+      totalBytes += chunk.length;
     });
 
     cacheStream.on('end', async () => {
       logger.info('Processing finished');
       try {
         // The empty chunk will signal the end of the stream
-        await this.#client.xAdd(streamName, '*', { chunk: YtAudioCache.emptyChunk });
+        await this.#client.xAdd(streamName, '*', { chunk: YtAudioCache.emptyChunk, totalSize: String(totalBytes) });
         await this.#client.expire(streamName, this.#opt.expirySeconds);
       } catch (error) {
-        logger.error('Error adding end buffer to stream:', error);
+        logger.error('Error adding end buffer to stream %o:', error);
       }
     });
 
@@ -95,6 +97,29 @@ class YtAudioCache {
   }
 
   /**
+   * Get the length of the audio stream in bytes
+   * @param videoId
+   * @returns {Promise<number>}
+   */
+  async getAudioLength(videoId, logger) {
+    const streamName = YtAudioCache.#streamName(videoId);
+    // const res = await this.#client.xRevRange(streamName, '+', '-', 'COUNT', 1);
+    try {
+      const res = await this.#client.xRevRange(streamName, '+', '-', {
+        BLOCK: 100,
+        COUNT: 1,
+      });
+      if (!res || res.length === 0 || !res[0].message?.totalSize) {
+        return undefined;
+      }
+      return Number(res[0].message?.totalSize);
+    } catch (e) {
+      logger.warn(`Error getting audio length: ${e.message}`);
+      return undefined;
+    }
+  }
+
+  /**
    * Stream audio data from the Redis cache,
    * continuously polling the stream for new data until the end buffer is found
    * @param {string} videoId Video ID to stream from cache
@@ -102,7 +127,6 @@ class YtAudioCache {
    * @param {pino.Logger} logger Logger instance
    * @returns {Promise<void>}
    */
-
   async streamAudio(videoId, to, logger) {
     const streamName = YtAudioCache.#streamName(videoId);
     const MAX_EMPTY_ITERATIONS = 10;

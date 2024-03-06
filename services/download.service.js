@@ -53,6 +53,10 @@ class DownloadService {
     await this.#cache.streamAudio(id, pt, logger);
     logger.info('Finished streaming audio data');
   }
+
+  getAudioLength(id, logger) {
+    return this.#cache.getAudioLength(id, logger);
+  }
 }
 
 module.exports = { DownloadService };
