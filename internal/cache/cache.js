@@ -137,7 +137,6 @@ class YtAudioCache {
     while (continuePolling) {
       // eslint-disable-next-line no-await-in-loop
       const res = await this.#client.xRead(redis.commandOptions({
-        isolated: true,
         returnBuffers: true,
       }), [
         {
