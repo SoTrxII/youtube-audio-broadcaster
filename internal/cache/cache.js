@@ -70,9 +70,14 @@ class YtAudioCache {
   async ingestWorker(videoId, cacheStream, decode, logger) {
     const streamName = YtAudioCache.#streamName(videoId);
 
+    let lenEstimate = 0;
+    cacheStream.once('info', (info) => {
+      lenEstimate = info.contentLength;
+    });
+
     let totalBytes = 0;
     cacheStream.on('data', async (chunk) => {
-      await this.#client.xAdd(streamName, '*', { chunk }).catch(logger.error);
+      await this.#client.xAdd(streamName, '*', { chunk, totalSize: String(lenEstimate) }).catch(logger.error);
       totalBytes += chunk.length;
     });
 
@@ -92,7 +97,7 @@ class YtAudioCache {
       await decode(videoId, cacheStream, logger, this.#opt);
     } catch (e) {
       await this.#client.del(streamName);
-      throw new Error(`Decoding failed for video ${videoId}`, { cause: e });
+      throw new Error(`Decoding failed for video ${videoId} : ${e.message}`, { cause: e });
     }
   }
 

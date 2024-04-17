@@ -13,9 +13,17 @@ async function convert(videoId, to, logger, opt) {
   // Ytdl stream cannot be piped directly to ffmpeg
   // with the pipeline, so errors need to be handled separately
   const ytStream = ytdl(`https://www.youtube.com/watch?v=${videoId}`, { filter: 'audioonly' });
-  ytStream.once('error', (error) => {
-    to.emit('error', error);
+  const vidLengthSec = await new Promise((res, rej) => {
+    ytStream.once('info', (info) => res(Number(info?.videoDetails?.lengthSeconds)));
+    ytStream.once('error', rej);
   });
+
+  logger.info('Video length: %d seconds', vidLengthSec);
+
+  // Estimate the length of the audio stream in bytes. This won't be accurate be enough to satisfy moody browsers
+  const lenEstimate = vidLengthSec * Number(opt.targetBitrate.replace('k', '000') / 8);
+  to.emit('info', { contentLength: lenEstimate });
+
   const transcode = ffmpeg(ytStream)
     .toFormat(opt.targetFormat)
     .audioBitrate(opt.targetBitrate)

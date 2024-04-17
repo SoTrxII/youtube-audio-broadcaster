@@ -29,4 +29,13 @@ describe('GET /stream/:id', () => {
       .expect('Accept-Ranges', 'bytes')
       .expect((res) => assert.notEqual(res.body.length, 0));
   });
+
+  it('Handles two parallel requests without without blocking', async () => {
+    const [res1, res2] = await Promise.all([
+      request.agent(server).get(`/stream/${testVideoId}`).set('Range', 'bytes=0-499999'),
+      request.agent(server).get(`/stream/${testVideoId}`).set('Range', 'bytes=500000-999999'),
+    ]);
+    assert.equal(res1.status, 206);
+    assert.equal(res2.status, 206);
+  });
 });

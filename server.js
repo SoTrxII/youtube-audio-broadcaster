@@ -4,12 +4,14 @@ const expressLogger = require('pino-http')({ logger });
 const express = require('express');
 const parseRange = require('range-parser');
 const { v4: uuidv4 } = require('uuid');
+const sendSeekable = require('send-seekable');
 const { downloadService, redis } = require('./dependency-injection');
 const { VideoError } = require('./internal/errors/video-error');
 require('dotenv').config();
 
 const app = express();
 app.use(expressLogger);
+app.use(sendSeekable);
 app.set('port', process.env.APP_PORT || 3000);
 
 app.get('/download/mp3/:id', handleSong);
@@ -22,46 +24,12 @@ async function handleSong(request, response) {
   try {
     response.setHeader('Content-Type', 'audio/mpeg');
     response.setHeader('Accept-Ranges', 'bytes');
+    logger.info('Requesting audio for video: %s from user agent', id, request.headers['Sec-Ch-Ua']);
     const to = new PassThrough();
-
-    // If the request has a range header,
-    // use Chunked transfer encoding to stream the requested range
-    if (request.headers.range) {
-      // The range request needs the total length of the audio file
-      // This won't be available in the cache if the video is not already processed
-      // so we use a default value
-      const totalBytes = await downloadService.getAudioLength(id, subLogger) ?? 5E8;
-      logger.debug('Total bytes: %d', totalBytes);
-
-      const ranges = parseRange(totalBytes, request.headers.range);
-      if (ranges === -1) {
-        response.status(416).send('Range Not Satisfiable');
-        return;
-      }
-      const { start, end } = ranges[0];
-
-      response.setHeader('Transfer-Encoding', 'chunked');
-      response.status(206);
-      response.write('\r\n');
-
-      to.on('data', (chunk) => {
-        const chunkStart = 0;
-        const chunkEnd = chunkStart + chunk.length - 1;
-
-        if (chunkEnd >= start && chunkStart <= end) {
-          const offset = Math.max(0, start - chunkStart);
-          const length = Math.min(chunk.length - offset, end - start + 1);
-          response.write(chunk.slice(offset, offset + length));
-        }
-      });
-
-      await downloadService.streamMp3(id, to, subLogger);
-      response.end('\r\n');
-    } else {
-      // If the request does not have a range header, stream the entire audio file
-      response.status(200);
-      await downloadService.streamMp3(id, response, subLogger);
-    }
+    await downloadService.streamMp3(id, to, subLogger);
+    const totalBytes = await downloadService.getAudioLength(id, subLogger);
+    logger.info('Total bytes: %d', totalBytes);
+    response.sendSeekable(to, { length: totalBytes, type: 'audio/mpeg' });
   } catch (error) {
     response.setHeader('Content-type', 'application/text');
     subLogger.error(`Error in request: ${error.message}`, { error });
