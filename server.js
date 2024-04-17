@@ -2,7 +2,6 @@ const { PassThrough } = require('stream');
 const logger = require('pino')({ level: 'debug' });
 const expressLogger = require('pino-http')({ logger });
 const express = require('express');
-const parseRange = require('range-parser');
 const { v4: uuidv4 } = require('uuid');
 const sendSeekable = require('send-seekable');
 const { downloadService, redis } = require('./dependency-injection');
