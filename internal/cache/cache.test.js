@@ -21,7 +21,7 @@ describe('YtAudioCache', () => {
         await cache.ingestWorker('test', new PassThrough(), decode, logger);
         t.fail();
       } catch (err) {
-        assert.equal(err.message, 'Decoding failed for video test');
+        assert.equal(err.message, 'Decoding failed for video test : Failed to process video');
         assert.equal(delMock.mock.calls.length, 1);
         assert.equal(delMock.mock.calls.length, 1);
       }

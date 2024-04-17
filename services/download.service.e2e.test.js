@@ -13,7 +13,7 @@ describe('DownloadService :: Integration', () => {
   let client;
   let lock;
   const logger = console;
-
+  const testId = 'FKLtgamrhpk';
   before(() => {
     client = redis.createClient({
       host: process.env.REDIS_HOST ?? 'localhost',
@@ -34,8 +34,8 @@ describe('DownloadService :: Integration', () => {
 
     const service = new DownloadService(cache, convert, lock);
     await Promise.all([
-      service.streamMp3('FKLtgamrhpk', new PassThrough(), logger),
-      service.streamMp3('FKLtgamrhpk', new PassThrough(), logger),
+      service.streamMp3(testId, new PassThrough(), logger),
+      service.streamMp3(testId, new PassThrough(), logger),
     ]);
     assert.equal(cache.ingestAsync.mock.callCount(), 1);
     assert.equal(cache.streamAudio.mock.callCount(), 2);
@@ -43,6 +43,7 @@ describe('DownloadService :: Integration', () => {
   });
 
   after(() => {
+    client.del(`audio_stream:${testId}`).catch(logger.error.bind(logger)); // Clean up the cache
     client.quit().catch(logger.error.bind(logger)); // Close the Redis client
   });
 });

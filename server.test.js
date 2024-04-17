@@ -4,7 +4,7 @@ const { describe, it, after } = require('node:test');
 const { server } = require('./server'); // path to your server.js file
 
 describe('GET /stream/:id', () => {
-  const testVideoId = 'FKLtgamrhpk';
+  const testVideoId = 'miomuSGoPzI';
   after(() => {
     server.close();
   });
