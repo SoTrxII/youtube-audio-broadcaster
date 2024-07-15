@@ -7,7 +7,7 @@
     "start:dev": "node server.js | pino-pretty -t"
   },
   "dependencies": {
-    "@distube/ytdl-core": "^4.13.3",
+    "@distube/ytdl-core": "^4.13.5",
     "express": "^4.17.2",
     "fluent-ffmpeg": "^2.1.2",
     "pino": "^6.13.0",
