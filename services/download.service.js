@@ -57,6 +57,37 @@ class DownloadService {
   getAudioLength(id, logger) {
     return this.#cache.getAudioLength(id, logger);
   }
+
+  /**
+   * Warm the cache for the video with the given ID
+   * @param id
+   * @param logger
+   * @returns {Promise<void>}
+   */
+  async warmCache(id, logger) {
+    let release;
+    logger.info('Warming cache for video %s', id);
+    try {
+      release = await this.#lock(`lock:${id}`);
+      if (await this.#cache.has(id)) {
+        logger.info('Video %s is already in cache', id);
+        return;
+      }
+      await this.#cache.ingestAsync(id, this.#decode, logger);
+    } finally {
+      await release();
+    }
+    logger.info('Finished warming cache for video %s', id);
+  }
+
+  /**
+   * Check if the video with the given ID is in the cache
+   * @param id
+   * @returns {Promise<*>}
+   */
+  async has(id) {
+    return this.#cache.has(id);
+  }
 }
 
 module.exports = { DownloadService };

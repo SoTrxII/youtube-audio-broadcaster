@@ -15,6 +15,8 @@ app.set('port', process.env.APP_PORT || 3000);
 
 app.get('/download/mp3/:id', handleSong);
 app.get('/stream/:id', handleSong);
+app.get('/warmup/:id', warmup);
+app.get('/has/:id', has);
 
 async function handleSong(request, response) {
   const { id } = request.params;
@@ -37,6 +39,40 @@ async function handleSong(request, response) {
       return;
     }
     response.status(500).send('Error streaming audio data');
+  }
+}
+
+// Add warmup endpoint
+async function warmup(request, response) {
+  const { id } = request.params;
+  const subLogger = logger.child({ requestId: uuidv4(), videoId: id });
+
+  try {
+    await downloadService.warmCache(id, subLogger);
+  } catch (error) {
+    subLogger.error(`Error in warmup: ${error.message}`, { error });
+    response.status(500).send('Error warming up cache');
+  }
+
+  response.status(200).send('Warmup successful');
+}
+
+/**
+ * Check if the video with the given ID is in the cache
+ * @param request
+ * @param response
+ * @returns {Promise<void>}
+ */
+async function has(request, response) {
+  const { id } = request.params;
+  const subLogger = logger.child({ requestId: uuidv4(), videoId: id });
+
+  try {
+    const isCached = await downloadService.has(id);
+    response.status(200).send({ cached: isCached });
+  } catch (error) {
+    subLogger.error(`Error in has: ${error.message}`, { error });
+    response.status(500).send('Error checking cache');
   }
 }
 

@@ -52,4 +52,26 @@ describe('DownloadService', () => {
     assert.equal(cache.ingestAsync.mock.callCount(), 1);
     assert.equal(cache.streamAudio.mock.callCount(), 0);
   });
+
+  it('Warms up cache for non-cached video ', async () => {
+    const cache = {
+      has: mock.fn(async () => false),
+      ingestAsync: mock.fn(async () => {}),
+    };
+    const service = new DownloadService(cache, decode, lock);
+    await service.warmCache('test', logger);
+    assert.equal(cache.has.mock.callCount(), 1);
+    assert.equal(cache.ingestAsync.mock.callCount(), 1);
+  });
+
+  it('Does not warm up cache for cached video', async () => {
+    const cache = {
+      has: mock.fn(async () => true),
+      ingestAsync: mock.fn(async () => {}),
+    };
+    const service = new DownloadService(cache, decode, lock);
+    await service.warmCache('test', logger);
+    assert.equal(cache.has.mock.callCount(), 1);
+    assert.equal(cache.ingestAsync.mock.callCount(), 0);
+  });
 });
