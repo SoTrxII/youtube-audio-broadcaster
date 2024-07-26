@@ -49,12 +49,11 @@ async function warmup(request, response) {
 
   try {
     await downloadService.warmCache(id, subLogger);
+    response.status(200).send('Warmup successful');
   } catch (error) {
     subLogger.error(`Error in warmup: ${error.message}`, { error });
-    response.status(500).send('Error warming up cache');
+    response.status(500).send(error.message);
   }
-
-  response.status(200).send('Warmup successful');
 }
 
 /**
