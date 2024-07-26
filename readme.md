@@ -44,6 +44,13 @@ curl http://localhost:3000/download/mp3/VIDEO_ID
 The first call will trigger the download and transcoding of the audio. 
 The other calls will return the cached audio as its being processed.
 
+Any given video can be warmed up, meaning the audio is downloaded and transcoded before the first request is made.
+This can be done by making a `GET` request to `/warmup/:id`.
+
+```bash
+curl http://localhost:3000/warmup/VIDEO_ID
+```
+
 ### Range Requests
 
 This server supports HTTP/1.1 range requests. 
