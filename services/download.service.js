@@ -73,7 +73,7 @@ class DownloadService {
         logger.info('Video %s is already in cache', id);
         return;
       }
-      await this.#cache.ingestAsync(id, this.#decode, logger);
+      await this.#cache.ingest(id, this.#decode, logger);
     } finally {
       await release();
     }

@@ -61,6 +61,22 @@ class YtAudioCache {
   }
 
   /**
+   * Starts processing the video with the given ID,
+   * converting it to an MP3 audio stream and storing it in Redis
+   * This methods resolves when the processing is finished
+   * @param {string} videoId Video ID to process
+   * @param {convertionFn} decode Function to convert the video to audio
+   * @param {pino.Logger} logger Logger instance
+   */
+  async ingest(videoId, decode, logger) {
+    return new Promise((res, rej) => {
+      const cacheStream = new PassThrough();
+      cacheStream.once('end', res);
+      this.ingestWorker(videoId, cacheStream, decode, logger).catch(rej);
+    });
+  }
+
+  /**
    * Process the video with the given ID, converting it to an MP3 audio stream
    * @param videoId
    * @param cacheStream
