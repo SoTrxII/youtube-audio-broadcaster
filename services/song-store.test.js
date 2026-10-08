@@ -29,6 +29,15 @@ describe('SongStore', () => {
     }
   });
 
+  it('reads the id out of Lullaby track ids', () => {
+    assert.equal(SongStore.parseId('dQw4w9WgXcQ-'), 'dQw4w9WgXcQ');
+    assert.equal(SongStore.parseId('dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+    assert.equal(SongStore.parseId('abcdefghij-'), 'abcdefghij-');
+    for (const bad of ['dQw4w9WgXcQx', 'dQw4w9WgXcQ--', '../../etc/pa-']) {
+      assert.equal(SongStore.parseId(bad), null, bad);
+    }
+  });
+
   it('evicts songs idle for longer than maxIdleDays', async () => {
     await addSong(dir, 'old', 200);
     await addSong(dir, 'recent', 10);

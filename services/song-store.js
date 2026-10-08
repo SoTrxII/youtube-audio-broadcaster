@@ -71,6 +71,16 @@ class SongStore {
     return VIDEO_ID.test(id);
   }
 
+  /**
+   * The video id in a request path, or null. Lullaby names its tracks the
+   * Roll20 way, `<file>-<suffix>` with an empty suffix, so every call it makes
+   * ends in `<id>-`: 2.0.0 refused them all with 400 and nothing played
+   */
+  static parseId(param) {
+    const id = param.length === 12 && param.endsWith('-') ? param.slice(0, 11) : param;
+    return SongStore.isValidId(id) ? id : null;
+  }
+
   pathOf(id) {
     return path.join(this.dir, `${id}.mp3`);
   }

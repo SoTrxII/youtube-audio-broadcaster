@@ -26,14 +26,15 @@ app.set('port', process.env.APP_PORT || 3000);
 /** Reject anything that isn't a video id before it reaches the disk or yt-dlp */
 function withId(handler) {
   return async (req, res) => {
-    if (!SongStore.isValidId(req.params.id)) {
+    const id = SongStore.parseId(req.params.id);
+    if (!id) {
       res.status(400).send('Invalid video id');
       return;
     }
     try {
-      await handler(req, res, req.params.id);
+      await handler(req, res, id);
     } catch (error) {
-      req.log.error(`${req.params.id}: ${error.message}`);
+      req.log.error(`${id}: ${error.message}`);
       // Lullaby shows this text as the warmup button's tooltip
       res.status(502).type('text').send(error.message);
     }
