@@ -1,44 +1,27 @@
-name: Test & Publish Coverage
+name: Test
 
+# No daily schedule anymore: it existed to catch ytdl-core breaking against
+# YouTube, and yt-dlp now updates itself at pod start instead
 on:
   push:
     branches:
       - master
-  schedule:
-    - cron: "0 11 * * *" # Runs every day at 12:00 PM (CET)
 
 jobs:
   func-build:
     runs-on: ubuntu-latest
-    services:
-      redis:
-        image: redis
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v3
         with:
-          version: 8
+          version: 9
 
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
 
-      - uses: FedericoCarboni/setup-ffmpeg@v3
-        with:
-          ffmpeg-version: release
-
       - run: pnpm install
 
       - name: Execute tests
         run: pnpm run test
-        env:
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379

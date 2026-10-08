@@ -1,30 +1,23 @@
 {
   "name": "youtube-audio-broadcaster",
-  "version": "1.2.0",
-  "main": "index.js",
+  "version": "2.0.0",
+  "main": "server.js",
   "license": "MIT",
   "scripts": {
     "start:dev": "node server.js | pino-pretty -t",
     "start": "node server.js",
-    "test": "node --test"
+    "test": "node --test services/song-store.test.js"
   },
   "dependencies": {
-    "@distube/ytdl-core": "^4.15.9",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "fluent-ffmpeg": "^2.1.2",
     "pino": "^8.21.0",
-    "pino-http": "^9.0.0",
-    "redis": "^4.6.15",
-    "redis-lock": "^1.0.0",
-    "send-seekable": "^1.0.4",
-    "uuid": "^9.0.1"
+    "pino-http": "^9.0.0"
   },
   "devDependencies": {
     "eslint": "^8.57.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-plugin-import": "^2.29.1",
-    "pino-pretty": "^10.3.1",
-    "supertest": "^6.3.4"
+    "pino-pretty": "^10.3.1"
   }
 }

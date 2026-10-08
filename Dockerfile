@@ -1,9 +1,11 @@
-FROM alpine:3.19 as prod
-# Nodejs-current is 20.X.
-RUN apk add --no-cache nodejs-current ffmpeg upx && upx --best --lzma /usr/bin/node && apk del upx \
-    && corepack enable && corepack prepare pnpm@latest-8 --activate
-COPY package.json pnpm-lock.yaml /app/
+FROM node:22-alpine
+# ffmpeg: yt-dlp's mp3 extraction. python3: yt-dlp itself, as the release
+# zipapp rather than the apk package, because the zipapp can update itself.
+# pnpm comes from npm: corepack's bundled signing keys go stale
+RUN apk add --no-cache ffmpeg python3 && npm install -g pnpm@9.15.9
+ADD --chmod=755 https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp /usr/local/bin/yt-dlp
 WORKDIR /app
-RUN pnpm install --prod
+COPY package.json pnpm-lock.yaml /app/
+RUN pnpm install --prod --frozen-lockfile
 COPY . /app
-ENTRYPOINT ["node", "/app/server.js"]
+ENTRYPOINT ["sh", "/app/docker-entrypoint.sh"]

@@ -1,0 +1,2 @@
+# The entrypoint runs in Linux: CRLF would break it if the image is built from a Windows checkout
+*.sh text eol=lf
