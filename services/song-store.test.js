@@ -55,6 +55,16 @@ describe('SongStore', () => {
     assert.deepEqual(await fs.readdir(dir), ['c.mp3']);
   });
 
+  it('evicts least recently used songs until they fit in maxBytes', async () => {
+    await addSong(dir, 'a', 30, 100);
+    await addSong(dir, 'b', 20, 100);
+    await addSong(dir, 'c', 10, 100);
+    // Plenty of disk left, but 300 bytes of songs for a 250 cap: only the oldest goes
+    const store = new SongStore({ dir, maxBytes: 250, freeBytes: async () => Infinity });
+    await store.makeRoom(quiet);
+    assert.deepEqual((await fs.readdir(dir)).sort(), ['b.mp3', 'c.mp3']);
+  });
+
   it('downloads a video once for concurrent requests and marks it used on later reads', async () => {
     let calls = 0;
     const download = async (id, outDir) => {

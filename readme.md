@@ -21,8 +21,10 @@ restarting the pod is usually enough.
 
 A file's modification time is its last use, refreshed on every play.
 - Songs unused for `MAX_IDLE_DAYS` are deleted (checked at start, then daily).
-- Before a download, if less than `MIN_FREE_MB` is free, the least recently used
-  songs are deleted until it is.
+- Before a download, if less than `MIN_FREE_MB` is free or the songs take more
+  than `MAX_CACHE_MB`, the least recently used ones are deleted until neither holds.
+  Set `MAX_CACHE_MB` when the volume does not enforce its size (k3s `local-path`
+  shows the whole node disk), otherwise only the node filling up triggers this.
 
 ## Configuration
 
@@ -32,6 +34,7 @@ A file's modification time is its last use, refreshed on every play.
 | `CACHE_DIR`     | Where finished mp3s are stored (mount a volume here)         | `/data`              |
 | `MAX_IDLE_DAYS` | Delete songs not played for this many days                   | `180`                |
 | `MIN_FREE_MB`   | Free space to keep on the volume before a download           | `1024`               |
+| `MAX_CACHE_MB`  | Total size of the songs to stay under (unset: no cap)        | unset                |
 | `AUDIO_BITRATE` | mp3 quality given to yt-dlp                                  | `192K`               |
 | `YTDLP_ARGS`    | Extra yt-dlp arguments (cookies, extractor args...)          | `--js-runtimes node` |
 

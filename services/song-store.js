@@ -50,18 +50,19 @@ async function statfsFree(dir) {
  *
  * A file's mtime is its last use (atime is unreliable, often mounted noatime):
  * idle files expire after maxIdleDays, and the least recently used ones go
- * first when the disk runs short.
+ * first when the disk runs short or the songs outgrow maxBytes.
  */
 class SongStore {
   #inFlight = new Map();
 
   constructor({
-    dir, maxIdleDays = 180, minFreeBytes = 1024 * 1024 * 1024,
+    dir, maxIdleDays = 180, minFreeBytes = 1024 * 1024 * 1024, maxBytes = Infinity,
     bitrate = '192K', extraArgs = [], download = ytDlp, freeBytes = statfsFree,
   }) {
     this.dir = dir;
     this.maxIdleMs = maxIdleDays * DAY_MS;
     this.minFreeBytes = minFreeBytes;
+    this.maxBytes = maxBytes;
     this.downloadOpt = { bitrate, extraArgs };
     this.download = download;
     this.freeBytes = freeBytes;
@@ -146,19 +147,25 @@ class SongStore {
   }
 
   /**
-   * Delete the least recently used songs until minFreeBytes are free.
+   * Delete the least recently used songs until minFreeBytes are free and the
+   * songs fit in maxBytes. Free space alone is not a cap: the volume's
+   * requested size is not enforced by k3s' local-path, so statfs reports the
+   * whole node disk (measured 2026-10-08: 290 GB seen from a "5Gi" volume).
+   * Runs before a download, so the total can exceed maxBytes by that one song.
    * Unlinking a song being served is safe: the open stream keeps reading it
    */
   async makeRoom(logger) {
     let free = await this.freeBytes(this.dir);
-    if (free >= this.minFreeBytes) return;
-    for (const s of await this.#songs()) {
+    const songs = await this.#songs();
+    let used = songs.reduce((sum, s) => sum + s.size, 0);
+    for (const s of songs) {
+      if (free >= this.minFreeBytes && used <= this.maxBytes) return;
       logger.info(`Evicting ${path.basename(s.file)} to free space`);
       await fs.rm(s.file, { force: true });
       free += s.size;
-      if (free >= this.minFreeBytes) return;
+      used -= s.size;
     }
-    logger.warn(`Only ${free} bytes free after evicting every song`);
+    if (free < this.minFreeBytes) logger.warn(`Only ${free} bytes free after evicting every song`);
   }
 
   /** Ready the directory: no download survives a restart, so any temp dir is junk */

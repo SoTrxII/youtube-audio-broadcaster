@@ -12,6 +12,8 @@ const store = new SongStore({
   // A song is 3-10 MB at 192k; 1 GiB of headroom keeps a whole evening's
   // worth of new songs from ever filling the volume mid-session
   minFreeBytes: Number(process.env.MIN_FREE_MB ?? 1024) * 1024 * 1024,
+  // The real size limit: unset means no cap, only the idle and free-space rules
+  maxBytes: process.env.MAX_CACHE_MB ? Number(process.env.MAX_CACHE_MB) * 1024 * 1024 : Infinity,
   bitrate: process.env.AUDIO_BITRATE ?? '192K',
   // The knob for YouTube's next change (cookies, extractor args...).
   // yt-dlp only enables deno by default to solve YouTube's JS challenges;
