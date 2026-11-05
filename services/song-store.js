@@ -7,6 +7,9 @@ const { promisify } = require('node:util');
 
 const execFileAsync = promisify(execFile);
 const DAY_MS = 24 * 3600 * 1000;
+// yt-dlp -U asks GitHub for the latest release: once an hour is plenty, and it
+// bounds the cost of videos that fail for good ("Video unavailable")
+const UPDATE_EVERY_MS = 3600 * 1000;
 // Every YouTube video id is 11 chars of base64url. Checking it matters: the id
 // becomes both a file name and a yt-dlp argument
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
@@ -17,9 +20,8 @@ const TMP_PREFIX = '.dl-';
 /**
  * Download one video's audio with yt-dlp into `outDir`, returning the mp3 path.
  * yt-dlp replaced @distube/ytdl-core, which is no longer maintained and broke
- * every time YouTube changed its player. The binary self-updates at container
- * start (docker-entrypoint.sh), so a YouTube-side break needs a pod restart,
- * not a release
+ * every time YouTube changed its player. The binary updates itself (SongStore's
+ * selfUpdate), so a YouTube-side break needs neither a release nor a restart
  */
 async function ytDlp(id, outDir, { bitrate, extraArgs }) {
   await execFileAsync('yt-dlp', [
@@ -30,6 +32,18 @@ async function ytDlp(id, outDir, { bitrate, extraArgs }) {
     `https://www.youtube.com/watch?v=${id}`,
   ], { maxBuffer: 10 * 1024 * 1024 });
   return path.join(outDir, 'audio.mp3');
+}
+
+/**
+ * Update the yt-dlp zipapp in place, returning its version before and after.
+ * Updating only at container start was not enough: a pod up since 2026-10-08
+ * still ran 2026.08.19 on 2026-11-05, two releases behind
+ */
+async function ytDlpUpdate() {
+  const version = async () => (await execFileAsync('yt-dlp', ['--version'])).stdout.trim();
+  const before = await version();
+  await execFileAsync('yt-dlp', ['-U']);
+  return { before, after: await version() };
 }
 
 async function statfsFree(dir) {
@@ -55,9 +69,12 @@ async function statfsFree(dir) {
 class SongStore {
   #inFlight = new Map();
 
+  #lastUpdate = -Infinity;
+
   constructor({
     dir, maxIdleDays = 180, minFreeBytes = 1024 * 1024 * 1024, maxBytes = Infinity,
     bitrate = '192K', extraArgs = [], download = ytDlp, freeBytes = statfsFree,
+    update = ytDlpUpdate,
   }) {
     this.dir = dir;
     this.maxIdleMs = maxIdleDays * DAY_MS;
@@ -66,6 +83,7 @@ class SongStore {
     this.downloadOpt = { bitrate, extraArgs };
     this.download = download;
     this.freeBytes = freeBytes;
+    this.update = update;
   }
 
   static isValidId(id) {
@@ -111,7 +129,16 @@ class SongStore {
     const tmpDir = await fs.mkdtemp(path.join(this.dir, TMP_PREFIX));
     try {
       logger.info(`Downloading ${id}`);
-      const out = await this.download(id, tmpDir, this.downloadOpt);
+      let out;
+      try {
+        out = await this.download(id, tmpDir, this.downloadOpt);
+      } catch (e) {
+        // YouTube breaks yt-dlp every few weeks and a fixed release follows
+        // within days: the first failure after one is when to fetch it
+        if (!await this.selfUpdate(logger)) throw e;
+        logger.warn(`${id}: retrying after a yt-dlp update`);
+        out = await this.download(id, tmpDir, this.downloadOpt);
+      }
       // Same filesystem, so the rename is atomic: readers see all of it or nothing
       await fs.rename(out, this.pathOf(id));
       logger.info(`Stored ${id}`);
@@ -123,6 +150,25 @@ class SongStore {
       throw new Error(reason, { cause: e });
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  }
+
+  /**
+   * Update yt-dlp, at most once per UPDATE_EVERY_MS. True only when the
+   * version changed, i.e. when retrying a failed download can help
+   */
+  async selfUpdate(logger, now = Date.now()) {
+    if (now - this.#lastUpdate < UPDATE_EVERY_MS) return false;
+    // Set before awaiting, so concurrent failures trigger a single update
+    this.#lastUpdate = now;
+    try {
+      const { before, after } = await this.update();
+      if (before === after) return false;
+      logger.info(`yt-dlp updated from ${before} to ${after}`);
+      return true;
+    } catch (e) {
+      logger.warn(`yt-dlp self-update failed: ${e.message}`);
+      return false;
     }
   }
 

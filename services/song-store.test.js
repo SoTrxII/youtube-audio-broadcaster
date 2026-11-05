@@ -7,6 +7,8 @@ const { SongStore } = require('./song-store');
 
 const DAY_MS = 24 * 3600 * 1000;
 const quiet = { info() {}, warn() {}, error() {} };
+// Never the real yt-dlp -U, which would update this machine's copy
+const noUpdate = async () => ({ before: 'x', after: 'x' });
 
 async function addSong(dir, id, ageDays, size = 10) {
   const file = path.join(dir, `${id}.mp3`);
@@ -94,14 +96,46 @@ describe('SongStore', () => {
       err.stderr = 'WARNING: whatever\nERROR: [youtube] dQw4w9WgXcQ: Video unavailable\n';
       throw err;
     };
-    const store = new SongStore({ dir, download, freeBytes: async () => Infinity });
+    const store = new SongStore({
+      dir, download, update: noUpdate, freeBytes: async () => Infinity,
+    });
     await assert.rejects(store.get('dQw4w9WgXcQ', quiet), /Video unavailable/);
     assert.deepEqual(await fs.readdir(dir), []);
   });
 
   it('still explains a failure when yt-dlp could not start', async () => {
     const download = async () => { throw Object.assign(new Error('spawn yt-dlp ENOENT'), { stderr: '' }); };
-    const store = new SongStore({ dir, download, freeBytes: async () => Infinity });
+    const store = new SongStore({
+      dir, download, update: noUpdate, freeBytes: async () => Infinity,
+    });
     await assert.rejects(store.get('dQw4w9WgXcQ', quiet), /ENOENT/);
+  });
+
+  it('retries a failed download once yt-dlp has updated, and updates at most hourly', async () => {
+    let calls = 0;
+    const download = async (id, outDir) => {
+      calls += 1;
+      if (calls === 1) throw Object.assign(new Error('Command failed'), { stderr: 'ERROR: Sign in to confirm' });
+      const out = path.join(outDir, 'audio.mp3');
+      await fs.writeFile(out, 'mp3');
+      return out;
+    };
+    let updates = 0;
+    const update = async () => { updates += 1; return { before: '2026.08.19', after: '2026.10.26' }; };
+    const store = new SongStore({ dir, download, update, freeBytes: async () => Infinity });
+    await store.get('dQw4w9WgXcQ', quiet);
+    assert.equal(calls, 2);
+    // Within the hour, no second update and so no retry
+    assert.equal(await store.selfUpdate(quiet), false);
+    assert.equal(updates, 1);
+  });
+
+  it('does not retry when yt-dlp was already up to date', async () => {
+    let calls = 0;
+    const download = async () => { calls += 1; throw Object.assign(new Error('x'), { stderr: 'ERROR: Video unavailable' }); };
+    const update = async () => ({ before: '2026.10.26', after: '2026.10.26' });
+    const store = new SongStore({ dir, download, update, freeBytes: async () => Infinity });
+    await assert.rejects(store.get('dQw4w9WgXcQ', quiet), /Video unavailable/);
+    assert.equal(calls, 1);
   });
 });
