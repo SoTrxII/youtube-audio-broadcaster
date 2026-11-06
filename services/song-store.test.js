@@ -138,4 +138,14 @@ describe('SongStore', () => {
     await assert.rejects(store.get('dQw4w9WgXcQ', quiet), /Video unavailable/);
     assert.equal(calls, 1);
   });
+
+  it('logs a failed YouTube check as an error, with yt-dlp\'s reason', async () => {
+    const errors = [];
+    const probe = async () => {
+      throw Object.assign(new Error('x'), { stderr: 'WARNING: x\nERROR: [youtube] dQw4w9WgXcQ: Sign in to confirm\n' });
+    };
+    const store = new SongStore({ dir, probe });
+    await store.check({ ...quiet, error: (m) => errors.push(m) });
+    assert.deepEqual(errors, ['YouTube check failed: ERROR: [youtube] dQw4w9WgXcQ: Sign in to confirm']);
+  });
 });

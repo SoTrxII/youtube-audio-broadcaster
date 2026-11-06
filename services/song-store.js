@@ -10,6 +10,8 @@ const DAY_MS = 24 * 3600 * 1000;
 // yt-dlp -U asks GitHub for the latest release: once an hour is plenty, and it
 // bounds the cost of videos that fail for good ("Video unavailable")
 const UPDATE_EVERY_MS = 3600 * 1000;
+// Up since 2009 and playable everywhere: if it fails, every download does
+const PROBE_ID = 'dQw4w9WgXcQ';
 // Every YouTube video id is 11 chars of base64url. Checking it matters: the id
 // becomes both a file name and a yt-dlp argument
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
@@ -46,6 +48,22 @@ async function ytDlpUpdate() {
   return { before, after: await version() };
 }
 
+/** Resolve one known video, downloading nothing, with the same cookies and proxy */
+async function ytDlpProbe(extraArgs) {
+  await execFileAsync('yt-dlp', [
+    '--simulate', '--no-playlist', '-f', 'bestaudio', ...extraArgs,
+    `https://www.youtube.com/watch?v=${PROBE_ID}`,
+  ]);
+}
+
+/**
+ * yt-dlp's last stderr line is its actual reason ("ERROR: Video unavailable").
+ * stderr is '' (not undefined) when yt-dlp could not even start
+ */
+function reasonOf(e) {
+  return (String(e.stderr ?? '').trim() || e.message).split('\n').pop();
+}
+
 async function statfsFree(dir) {
   const s = await fs.statfs(dir);
   return s.bavail * s.bsize;
@@ -74,7 +92,7 @@ class SongStore {
   constructor({
     dir, maxIdleDays = 180, minFreeBytes = 1024 * 1024 * 1024, maxBytes = Infinity,
     bitrate = '192K', extraArgs = [], download = ytDlp, freeBytes = statfsFree,
-    update = ytDlpUpdate,
+    update = ytDlpUpdate, probe = ytDlpProbe,
   }) {
     this.dir = dir;
     this.maxIdleMs = maxIdleDays * DAY_MS;
@@ -84,6 +102,7 @@ class SongStore {
     this.download = download;
     this.freeBytes = freeBytes;
     this.update = update;
+    this.probe = probe;
   }
 
   static isValidId(id) {
@@ -144,10 +163,7 @@ class SongStore {
       logger.info(`Stored ${id}`);
       return this.pathOf(id);
     } catch (e) {
-      // yt-dlp's last stderr line is its actual reason ("ERROR: Video unavailable")
-      // stderr is '' (not undefined) when yt-dlp could not even start
-      const reason = (String(e.stderr ?? '').trim() || e.message).split('\n').pop();
-      throw new Error(reason, { cause: e });
+      throw new Error(reasonOf(e), { cause: e });
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }
@@ -169,6 +185,20 @@ class SongStore {
     } catch (e) {
       logger.warn(`yt-dlp self-update failed: ${e.message}`);
       return false;
+    }
+  }
+
+  /**
+   * Expired cookies or a bot wall otherwise show only when someone asks for a
+   * song not on disk, possibly mid-session. Logged as an error, so the
+   * "YouTube download failed" alert fires the day it happens
+   */
+  async check(logger) {
+    try {
+      await this.probe(this.downloadOpt.extraArgs);
+      logger.info('YouTube check passed');
+    } catch (e) {
+      logger.error(`YouTube check failed: ${reasonOf(e)}`);
     }
   }
 

@@ -62,8 +62,10 @@ app.get('/has/:id', withId(async (req, res, id) => {
 store.init(logger).then(() => {
   setInterval(() => store.evictIdle(logger).catch((e) => logger.error(e)), DAY_MS).unref();
 });
-// Daily, so a fixed yt-dlp is usually in place before a download fails; the
-// entrypoint covers the start
-setInterval(() => store.selfUpdate(logger), DAY_MS).unref();
+// Daily, so a fixed yt-dlp is usually in place before a download fails (the
+// entrypoint covers the start), then a check that YouTube still serves us.
+// The check also runs at start: right after new cookies, it tells if they work
+store.check(logger);
+setInterval(() => store.selfUpdate(logger).then(() => store.check(logger)), DAY_MS).unref();
 
 app.listen(app.get('port'), () => logger.info(`Started web server on port: ${app.get('port')}`));
